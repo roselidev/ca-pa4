@@ -1,0 +1,93 @@
+#------------------------------------------------------------------
+# 
+#  4190.308 Computer Architecture (Spring 2019)
+#
+#  Project #4: Optimizing Program for a Pipelined Y86-64 Processor
+#
+#  May 28, 2019
+#
+#  Jin-Soo Kim (jinsoo.kim@snu.ac.kr)
+#  Systems Software & Architecture Laboratory
+#  Dept. of Computer Science and Engineering
+#  Seoul National University
+#
+#------------------------------------------------------------------
+
+bmp_diag:
+	# imgptr is in %rdi
+	# width  is in %rsi
+	# height is in %rdx
+	# gap 	 is in %rcx
+	#-----------------------------------------------------------------
+
+	# FILL HERE
+	# You are allowed to use any register supported by Y86-64 architecture
+
+#############Setting Registers To ###############
+#       rax : padding           r8 : Y
+#       rcx : gap               r9 : (h-1)(3w + pad) + 3w - 1 
+#       rdx : height-1          r10 : 3w + pad
+#       rbx : 3*width-1         r11 : 0x03
+#       rsp :                   r12 : 0x01
+#       rbp : 3w+pad            r13 : 0x00
+#       rsi : 3*width           r14 : 0xff
+#       rdi : imgptr
+#################################################
+
+  irmovq        $3, %r11
+  irmovq        $1, %r12
+  irmovq        $0, %r13
+  irmovq        $255, %r14
+
+  rrmovq        %rsi, %rax
+  andq          %r11, %rax  # pad in %rax
+
+  mulq          %r11, %rsi  # 3w in %rsi
+  rrmovq        %rsi, %rbx  # 3w in %rbx
+  subq          %r12, %rbx  # 3w-1 in %rbx
+  rrmovq        %rsi, %r10
+  addq          %rax, %r10  # 3w + pad in %r10
+
+  subq          %r12, %rdx  # h-1 in %rdx
+
+  rrmovq        %r10, %r9
+  mulq          %rdx, %r9
+  addq          %rsi, %r9
+  subq          %r12, %r9   # End address of image in %r9
+  addq          %r9, %rdi   # imgptr set to (W-1, H-1)
+  rrmovq        %rdx, %r8   # Y = H-1 in %r8
+
+
+.compare:
+  xorq          %rsp, %rsp
+  addq          %r13, %rsp
+  addq          %r9, %rsp
+  divq          %rcx, %rsp
+  mulq          %rcx, %rsp
+  subq          %r13, %rsp
+  subq          %r9, %rsp
+  jnz           .compare2
+  rmmovb        %r14, (%rdi)
+  rmmovb        %r14, 1(%rdi)
+  rmmovb        %rbx, 2(%rdi)
+
+.compare2:
+  xorq          %rax, %rax
+  addq          %r9, %rax
+  addq          %r10, %rax
+  divq          %rcx, %rax
+  mulq          %rcx, %rax
+  subq          %r9, %rax
+  subq          %r10, %rax
+  jnz           .cnt
+  rmmovb        %r14, (%rdi)
+  rmmovb        %r14, 1(%rdi)
+  rmmovb        %rbx, 2(%rdi)
+
+.cnt:
+  subq          %r13, %rsi
+  jnz           .compare
+  irmovq        %rbp, %rsi
+  subq          %r13, %height
+  jnz           .compare
+  ret

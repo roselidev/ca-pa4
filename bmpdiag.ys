@@ -22,61 +22,55 @@ bmp_diag:
 
 	# FILL HERE
 	# You are allowed to use any register supported by Y86-64 architecture
-movq	%rsi, %rax
-and 	$3, %rax
-leaq	(%rsi, %rsi, 2), %r8
-addq  %rax, %r8
+  
 
-pushq %r8
-pushq %rdx
-pushq %rsi
-pushq %rcx
+  rrmovq	    %rsi,  %rax
+  irmovq        $3, %r12    # 3 in %r12
+  irmovq        $1, %r13    # 1 in %r13
+  xorq          %r14, %r14  # 0 in %r14
+  rrmovq        %rsi, %rbp
+  andq 	        $r12, %rax  # pad in %rax
+  subq          %r13, %rdx  # h-1 in %rdx
+  irmovq        0xff, %r11  # 0xff in %r11
+  mulq          %r12, %rbp  # 3w in %rbp
+  irmovq        %rbp, %rsi  # 3w in %rsi
+  addq          %rax, %rbp  # 3w + pad in %rbp
+  rrmovq        %rbp, %r8
+  mulq          %rdx, %r8   # (h-1)(3w+padding) in %r8
+  addq          %r8, %rdi   # imgptr set to (0,0)
+  xorq          %r9, %r9    # x = 0 in %r9
+  xorq          %r10, %r10  # y = 0 in %r10
+  
+.compare:
+  xorq          %rax, %rax
+  addq          %r9, %rax
+  addq          %r10, %rax
+  divq          %rcx, %rax
+  mulq          %rcx, %rax
+  subq          %r9, %rax
+  subq          %r10, %rax
+  jnz           .compare2
+  rmmovb        %r14, (%rdi)
+  rmmovb        %r14, 1(%rdi)
+  rmmovb        %rbx, 2(%rdi)
 
-dec   %rdx
-imulq	%rdx, %r8
-addq	%r8, %rdi
-movq  %rdi, %rsi
-xor %rcx, %rcx
-xor %r8,  %r8
+.compare2:
+  xorq          %rax, %rax
+  addq          %r9, %rax
+  addq          %r10, %rax
+  divq          %rcx, %rax
+  mulq          %rcx, %rax
+  subq          %r9, %rax
+  subq          %r10, %rax
+  jnz           .cnt
+  rmmovb        %r14, (%rdi)
+  rmmovb        %r14, 1(%rdi)
+  rmmovb        %rbx, 2(%rdi)
 
-.L0:
-  movq  %r8, %rax
-  subq  %rcx, %rax
-  xor   %rdx,%rdx
-  cqto
-  idivq (%rsp)
-  or $0, %rdx
-  jz  .L2
-
-  leaq  (%r8, %rcx), %rax
-  xor   %rdx, %rdx
-  idivq (%rsp)
-  or $0, %rdx
-  jz  .L2
-.L1:
-  inc   %r8
-  addq  $3, %rdi
-  cmpq  %r8 , 8(%rsp)
-  jg    .L0
-.L3:
-  inc   %rcx
-  cmpq  %rcx, 16(%rsp)
-  jle   .L4
-  subq  24(%rsp), %rsi
-  movq  %rsi, %rdi
-  xor   %r8, %r8
-  jmp   .L0
-.L2:
-  movw  $0, (%rdi)
-  movb  $0xff, 2(%rdi)
-  jmp .L1
-.L4:
-  popq %rax
-  popq %rax
-  popq %rax
-  popq %rax
+.cnt:
+  subq          %r13, %rsi
+  jnz           .compare
+  irmovq        %rbp, %rsi
+  subq          %r13, %height
+  jnz           .compare
   ret
-
-
-
-
