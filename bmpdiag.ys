@@ -1,78 +1,145 @@
-#--------------------------------------------------------------
+#------------------------------------------------------------------
 # 
 #  4190.308 Computer Architecture (Spring 2019)
 #
-#  Project #3: Drawing diagonal lines in an image
+#  Project #4: Optimizing Program for a Pipelined Y86-64 Processor
 #
-#  April 24, 2019.
+#  May 28, 2019
 #
 #  Jin-Soo Kim (jinsoo.kim@snu.ac.kr)
 #  Systems Software & Architecture Laboratory
 #  Dept. of Computer Science and Engineering
 #  Seoul National University
 #
-#--------------------------------------------------------------
-
-.text
-	.align 4
-.globl bmp_diag
-	.type bmp_diag,@function
+#------------------------------------------------------------------
 
 bmp_diag:
-	#------------------------------------------------------------
-	# Use %rax, %rcx, %rdx, %rsi, %rdi, and %r8 registers only
-	#	imgptr is in %rdi
-	#	width  is in %rsi
-	#	height is in %rdx
-	#	gap    is in %rcx
-	#------------------------------------------------------------
+	# imgptr is in %rdi
+	# width  is in %rsi
+	# height is in %rdx
+	# gap 	 is in %rcx
+	#-----------------------------------------------------------------
 
-#---------------------------------------
-#   initialize startpoint
-#
-# %rax	 %rcx	 %rdx	 %rsi	 %rdi	%r8
-#   -     gap      h       w      ptr    -
-#
-#---------------------------------------
+	# FILL HERE
+	# You are allowed to use any register supported by Y86-64 architecture
 
-pushq   %rdi
-movq	%rsi, %rax	# %rax = w
-andq	$0x03, %rax	# %rax : padding
-leaq	(%rsi, %rsi, 2), %rsi   # %rsi = 3w
-movq	%rsi, %r8	# %r8 = 3w
+#############Setting Registers To ###############
+#       rax : padding ==> rep   r8 : X=0
+#       rcx : gap               r9 : (h-1)(3w + pad) ==> Y=0
+#       rdx : height            r10 : 3w + pad
+#       rbx : 3*gap+3           r11 : 0x03
+#       rsp :                   r12 : 0x01
+#       rbp :                   r13 : 0x00
+#       rsi : width             r14 : 0xff
+#       rdi : imgptr
+#################################################
 
+  irmovq        $3, %r11
+  irmovq        $1, %r12
+  irmovq        $0, %r13
+  irmovq        $255, %r14
 
-subq	$0x01, %rdx	# %rdx = h-1
-addq	%rax, %rsi	# %rsi = (3w+padding)
-imulq	%rdx, %rsi	# %rsi = (h-1)*(3w+padding)
-addq	%rsi, %rdi	#initialize ptr to (0,0) %rdi = ptr + (h-1)(3w+padding)
-addq	%rax, %r8	# %r8 = 3w+padding
-subq	$0x03, %rdi
-addq    %r8,    %rdi
-popq    %rax
-#------------------------------------------
-#
-#
-# %rax   %rcx    %rdx    %rsi               %rdi    %r8
-#
-#  ptr    gap     h-1   (h-1)(3w+padding)   ptr+%rsi 3w+padding
-#
-#------------------------------------------
+  rrmovq        %rsi, %rax
+  andq          %r11, %rax  # pad in %rax
 
 
-.L2:
-  addq  $0x03,  %rdi # x = x+1
-  subq  %r8,    %rdi # y = y-1
-  cmpq  %rdi, %rax
-  jg    .L3
-  movb  $0x00,  (%rdi)
-  movb  $0x00,  1(%rdi)
-  movb  $0xff,  2(%rdi)
-  cmpq  %rdi, %rax
-  jl    .L2
+  addq          %r12, %rcx  # gap + 1 in %rcx
+  rrmovq        %rcx, %rbx
+  mulq          %r11, %rbx  # 3(gap)+3 in %rbx
+  rrmovq        %rsi, %r10
+  mulq          %r11, %r10
+  addq          %rax, %r10  # 3w + pad in %r10
+  subq          %r12, %rcx  # gap in %rcx
+  subq          %r12, %rdx  # h-1 in %rdx
+  rrmovq        %r10, %r9
+  mulq          %rdx, %r9   # (h-1)(3w+pad) in %r9
+  addq          %r12, %rdx  # h in %rdx
+  addq          %r10, %r10
+  subq          %rax, %r10
+  subq          %r11, %r10
+  addq          %r9, %rdi   # imgptr set to (0,0)
+  rrmovq        %rsi, %rax
+  divq          %rcx, %rax  #repition count in %rax
+  rrmovq        %rax, %rbp
+  mulq          %rcx, %rbp
+  rrmovq        %rsi, %r8
+  subq          %rbp, %r8
+  pushq         %r8         #store residual num of pixel
+  xorq          %r8, %r8    # X=0 in r9
+  xorq          %r9, %r9  # Y=0 in r10
 
+###############Current Register##################
+#       rax : rep               r8 : X=0
+#       rcx : gap               r9 : Y=0
+#       rdx : height            r10 : 3w + pad + 3(w-1)(Y decrement)
+#       rbx : 3(gap+1)          r11 : 0x03
+#       rsp :                   r12 : 0x01
+#       rbp :                   r13 : 0x00
+#       rsi : width             r14 : 0xff
+#       rdi : imgptr
+#################################################
 
+compare:
+  rrmovq        %r8, %rbp
+  addq          %r9, %rbp
+  divq          %rcx, %rbp
+  mulq          %rcx, %rbp
+  subq          %r9, %rbp
+  subq          %r8, %rbp
+  jne           compare2
 
-.L3:
-ret
+color:
+  popq          %rbp
+  pushq         %rax
+  pushq         %rdi
+  pushq         %rbp
+
+jumpcolor:
+  rmmovb          %r13,(%rdi)
+  rmmovb          %r13,1(%rdi)
+  rmmovb          %r14,2(%rdi) #set current pixel to red
+  addq          %rbx, %rdi
+  subq          %r12, %rax
+  jl            jumpcolor
+
+  subq          %r8, %rbp
+  jl            jumpcolor
+
+reset:
+  popq          %rbp
+  popq          %rdi
+  popq          %rax
+  pushq         %rbp
+  jmp           inc
+
+compare2:
+  rrmovq        %r9, %rbp
+  subq          %r8, %rbp
+  divq          %rcx, %rbp
+  mulq          %rcx, %rbp
+  addq          %r8, %rbp
+  subq          %r9, %rbp
+  jne           inc
+  jmp           color
+ 
+inc:
+  rrmovq        %rcx, %rbp
+  addq          %r12, %r8  # X=X+1
+  subq          %r8, %rbp
+  jle           Xinc
+  xorq          %r8, %r8   # X=0
+  rrmovq        %rdx, %rbp
+  addq          %r12, %r9  # Y=Y+1
+  subq          %r9, %rbp
+  jl            Yinc
+  popq          %rax
+  ret
+
+Xinc:
+  addq          %r11, %rdi 
+  jmp           compare
+
+Yinc:
+  subq          %r10, %rdi
+  jmp           compare
 
