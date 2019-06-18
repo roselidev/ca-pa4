@@ -99,7 +99,7 @@ jumpcolor:
   rmmovb          %r13,1(%rdi)
   rmmovb          %r14,2(%rdi) #set current pixel to red
   addq          %rbx, %rdi
-  subq          %r12, %rax
+  iaddq         $-1, %rax
   jl            jumpcolor
 
   subq          %r8, %rbp
@@ -114,29 +114,33 @@ reset:
 
 compare2:
   rrmovq        %r9, %rbp
-  subq          %r8, %rbp
+  subq          %r8, %rbp # y - x
+  cmovg		%rbp, %rbp
+  rrmovq	%r8, %r12
+  subq		%r9, %r12 # x - y
+  cmovg		%r12, %rbp
+  rrmovq	%rbp, %r12
   divq          %rcx, %rbp
   mulq          %rcx, %rbp
-  addq          %r8, %rbp
-  subq          %r9, %rbp
+  subq		%r12, %rbp
   jne           inc
   jmp           color
  
 inc:
   rrmovq        %rcx, %rbp
-  addq          %r12, %r8  # X=X+1
+  iaddq         $1, %r8  # X=X+1
   subq          %r8, %rbp
   jle           Xinc
   xorq          %r8, %r8   # X=0
   rrmovq        %rdx, %rbp
-  addq          %r12, %r9  # Y=Y+1
+  iaddq         $1, %r9  # Y=Y+1
   subq          %r9, %rbp
   jl            Yinc
   popq          %rax
   ret
 
 Xinc:
-  addq          %r11, %rdi 
+  iaddq         $3, %rdi 
   jmp           compare
 
 Yinc:
