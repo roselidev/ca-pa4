@@ -1,76 +1,78 @@
-#------------------------------------------------------------------
+#--------------------------------------------------------------
 # 
 #  4190.308 Computer Architecture (Spring 2019)
 #
-#  Project #4: Optimizing Program for a Pipelined Y86-64 Processor
+#  Project #3: Drawing diagonal lines in an image
 #
-#  May 28, 2019
+#  April 24, 2019.
 #
 #  Jin-Soo Kim (jinsoo.kim@snu.ac.kr)
 #  Systems Software & Architecture Laboratory
 #  Dept. of Computer Science and Engineering
 #  Seoul National University
 #
-#------------------------------------------------------------------
+#--------------------------------------------------------------
+
+.text
+	.align 4
+.globl bmp_diag
+	.type bmp_diag,@function
 
 bmp_diag:
-	# imgptr is in %rdi
-	# width  is in %rsi
-	# height is in %rdx
-	# gap 	 is in %rcx
-	#-----------------------------------------------------------------
+	#------------------------------------------------------------
+	# Use %rax, %rcx, %rdx, %rsi, %rdi, and %r8 registers only
+	#	imgptr is in %rdi
+	#	width  is in %rsi
+	#	height is in %rdx
+	#	gap    is in %rcx
+	#------------------------------------------------------------
 
-	# FILL HERE
-	# You are allowed to use any register supported by Y86-64 architecture
-  
+#---------------------------------------
+#   initialize startpoint
+#
+# %rax	 %rcx	 %rdx	 %rsi	 %rdi	%r8
+#   -     gap      h       w      ptr    -
+#
+#---------------------------------------
 
-  rrmovq	    %rsi,  %rax
-  irmovq        $3, %r12    # 3 in %r12
-  irmovq        $1, %r13    # 1 in %r13
-  xorq          %r14, %r14  # 0 in %r14
-  rrmovq        %rsi, %rbp
-  andq 	        $r12, %rax  # pad in %rax
-  subq          %r13, %rdx  # h-1 in %rdx
-  irmovq        0xff, %r11  # 0xff in %r11
-  mulq          %r12, %rbp  # 3w in %rbp
-  irmovq        %rbp, %rsi  # 3w in %rsi
-  addq          %rax, %rbp  # 3w + pad in %rbp
-  rrmovq        %rbp, %r8
-  mulq          %rdx, %r8   # (h-1)(3w+padding) in %r8
-  addq          %r8, %rdi   # imgptr set to (0,0)
-  xorq          %r9, %r9    # x = 0 in %r9
-  xorq          %r10, %r10  # y = 0 in %r10
-  
-.compare:
-  xorq          %rax, %rax
-  addq          %r9, %rax
-  addq          %r10, %rax
-  divq          %rcx, %rax
-  mulq          %rcx, %rax
-  subq          %r9, %rax
-  subq          %r10, %rax
-  jnz           .compare2
-  rmmovb        %r14, (%rdi)
-  rmmovb        %r14, 1(%rdi)
-  rmmovb        %rbx, 2(%rdi)
+pushq   %rdi
+movq	%rsi, %rax	# %rax = w
+andq	$0x03, %rax	# %rax : padding
+leaq	(%rsi, %rsi, 2), %rsi   # %rsi = 3w
+movq	%rsi, %r8	# %r8 = 3w
 
-.compare2:
-  xorq          %rax, %rax
-  addq          %r9, %rax
-  addq          %r10, %rax
-  divq          %rcx, %rax
-  mulq          %rcx, %rax
-  subq          %r9, %rax
-  subq          %r10, %rax
-  jnz           .cnt
-  rmmovb        %r14, (%rdi)
-  rmmovb        %r14, 1(%rdi)
-  rmmovb        %rbx, 2(%rdi)
 
-.cnt:
-  subq          %r13, %rsi
-  jnz           .compare
-  irmovq        %rbp, %rsi
-  subq          %r13, %height
-  jnz           .compare
-  ret
+subq	$0x01, %rdx	# %rdx = h-1
+addq	%rax, %rsi	# %rsi = (3w+padding)
+imulq	%rdx, %rsi	# %rsi = (h-1)*(3w+padding)
+addq	%rsi, %rdi	#initialize ptr to (0,0) %rdi = ptr + (h-1)(3w+padding)
+addq	%rax, %r8	# %r8 = 3w+padding
+subq	$0x03, %rdi
+addq    %r8,    %rdi
+popq    %rax
+#------------------------------------------
+#
+#
+# %rax   %rcx    %rdx    %rsi               %rdi    %r8
+#
+#  ptr    gap     h-1   (h-1)(3w+padding)   ptr+%rsi 3w+padding
+#
+#------------------------------------------
+
+
+.L2:
+  addq  $0x03,  %rdi # x = x+1
+  subq  %r8,    %rdi # y = y-1
+  cmpq  %rdi, %rax
+  jg    .L3
+  movb  $0x00,  (%rdi)
+  movb  $0x00,  1(%rdi)
+  movb  $0xff,  2(%rdi)
+  cmpq  %rdi, %rax
+  jl    .L2
+
+
+
+.L3:
+ret
+

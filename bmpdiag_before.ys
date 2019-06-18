@@ -24,12 +24,12 @@ bmp_diag:
 	# You are allowed to use any register supported by Y86-64 architecture
 
 #############Setting Registers To ###############
-#       rax : padding           r8 : Y
-#       rcx : gap               r9 : (h-1)(3w + pad) + 3w - 1 
+#       rax : padding           r8 : X=0
+#       rcx : gap               r9 : (h-1)(3w + pad) ==> Y=0
 #       rdx : height-1          r10 : 3w + pad
-#       rbx : 3*width-1         r11 : 0x03
+#       rbx : 3(gap+1)-1        r11 : 0x03
 #       rsp :                   r12 : 0x01
-#       rbp : 3w+pad            r13 : 0x00
+#       rbp :                   r13 : 0x00
 #       rsi : 3*width           r14 : 0xff
 #       rdi : imgptr
 #################################################
@@ -43,22 +43,66 @@ bmp_diag:
   andq          %r11, %rax  # pad in %rax
 
   mulq          %r11, %rsi  # 3w in %rsi
-  rrmovq        %rsi, %rbx  # 3w in %rbx
-  subq          %r12, %rbx  # 3w-1 in %rbx
+  addq          %r12, %rcx  # gap + 1 in %rcx
+  rrmovq        %rcx, %rbx
+  mulq          %r11, %rbx
+  subq          %r12, %rbx  # 3(gap)-1 in %rbx
   rrmovq        %rsi, %r10
   addq          %rax, %r10  # 3w + pad in %r10
-
+  subq          %r12, %rcx  # gap in %rcx
   subq          %r12, %rdx  # h-1 in %rdx
 
   rrmovq        %r10, %r9
   mulq          %rdx, %r9
-  addq          %rsi, %r9
-  subq          %r12, %r9   # End address of image in %r9
-  addq          %r9, %rdi   # imgptr set to (W-1, H-1)
-  rrmovq        %rdx, %r8   # Y = H-1 in %r8
+  subq          %r12, %r9   # (h-1)(3w+pad) in %r9
+  addq          %r9, %rdi   # imgptr set to (0,0)
+  xorq          %r8, %r8    # X=0 in r9
+  xorq          %r9, %r9  # Y=0 in r10
 
 
 .compare:
+  rrmovq        %r8, %rbp
+  addq          %r9, %rbp
+  divq          %rcx, %rbp
+  mulq          %rcx, %rbp
+  subq          %r9, %rbp
+  subq          %r8, %rbp
+  jnz           .compare2
+
+.color:
+  movb          %r13,(%rdi)
+  movb          %r13,1(%rdi)
+  movb          %r14,2(%rdi)
+  jump          .jumpcolor
+
+.compare2:
+  rrmovq        %r9, %rbp
+  subq          %r8, %rbp
+  divq          %rcx, %rbp
+  mulq          %rcx, %rbp
+  addq          %r8, %rbp
+  subq          %r9, %rbp
+  jnz           .inc
+  jz            .color
+
+.jumpcolor:
+  next rdi  = rdi + 3(gap+1)
+  if count > 0
+  jg .color
+  else .inc
+  
+.inc
+  x = x + 1
+  if 3x > 3w
+  x = 0 , y = y + 1
+    if y < h
+    next rdi = rdi - ydec - 3w +3
+    else
+    ret
+  else
+  next rdi = rdi + 3
+
+
   xorq          %rsp, %rsp
   addq          %r13, %rsp
   addq          %r9, %rsp
