@@ -40,14 +40,12 @@ bmp_diag:
 
   rrmovq        %rsi, %rax
   andq          %r11, %rax  # pad in %rax
-
-
   iaddq         $1, %rcx  # gap + 1 in %rcx
   rrmovq        %rcx, %rbx
   mulq          %r11, %rbx  # 3(gap)+3 in %rbx
   rrmovq        %rsi, %r10
   mulq          %r11, %r10
-  rrmovq	%r10, %r12  # 3w in %r12
+  rrmovq	    %r10, %r12  # 3w in %r12
   addq          %rax, %r10  # 3w + pad in %r10
   iaddq         $-1, %rcx  # gap in %rcx
   iaddq         $-1, %rdx  # h-1 in %rdx
@@ -56,7 +54,7 @@ bmp_diag:
   iaddq         $1, %rdx    # h in %rdx
   addq          %r10, %r10
   subq          %rax, %r10
-  subq          %r11, %r10
+  subq          %r11, %r10  # y decrement in %r10
   addq          %r9, %rdi   # imgptr set to (0,0)
   rrmovq        %rsi, %rax
   divq          %rcx, %rax  #repition count in %rax
@@ -88,8 +86,10 @@ compare:
 
 color:
   pushq         %rdi
+  rrmovq        %r12, %rbp
 
 jumpcolor:
+  rrmovq          %rbp, %r12
   rmmovb          %r13,(%rdi)
   rmmovb          %r13,1(%rdi)
   rmmovb          %r14,2(%rdi) #set current pixel to red
@@ -117,7 +117,6 @@ compare2:
  
 inc:
   rrmovq        %rcx, %rbp
-  iaddq         $1, %r8  # X=X+1
   subq          %r8, %rbp
   jge           Xinc
   xorq          %r8, %r8   # X=0
@@ -128,6 +127,7 @@ inc:
   ret
 
 Xinc:
+  iaddq         $1, %r8
   iaddq         $3, %rdi 
   jmp           compare
 
