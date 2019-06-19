@@ -65,7 +65,6 @@ ColorP:
   # Store end of line
   rrmovq  %r10, %rbp
   addq    %rdi, %rbp
-  pushq    %rbp
   # Color X1, X2
   rmmovb  %r13, (%rax)
   rmmovb  %r13, 1(%rax)
@@ -83,7 +82,6 @@ ColorP:
 # %rdi = ptr(0,H-1)		%r13 = 0
 # %rbp				%r14 = 255
 # %rsp  
-  popq %rbp
 ColorLoop:
   rmmovb  %r13, (%r8)
   rmmovb  %r13, 1(%r8)
@@ -103,6 +101,12 @@ IncIterator:
   rrmovq  %rbp, %rsi
   subq    %r8, %rsi
   jg      ColorLoop
+  subq	  %rcx, %r8
+
+CheckEnd:
+  iaddq	  $-1, %rdx
+  jg	  IncPoint
+  ret
 
 IncPoint:
   addq    %r11, %rdi
@@ -110,9 +114,13 @@ IncPoint:
   iaddq   $-1, %rax
   addq    %r11, %rbx
   iaddq   $1, %rbx
-  rrmovq  %rdi, %rbp
-  subq    %rax, %rbp
-  jle	  ColorP
+  rrmovq  %rax, %rbp
+  subq    %rdi, %rbp
+  jge	  ColorP
+  jmp 	  Reset
+  
+ Reset:
   addq    %rcx, %rax
   rrmovq  %rdi, %rbx
+  jmp     ColorP
 
