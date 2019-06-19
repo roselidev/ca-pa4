@@ -44,21 +44,75 @@ bmp_diag:
   rrmovq  %rax, %r9
   divq    %rcx, %r9
   mulq    %rcx, %r9
-  subq    %r9, %rax 
-  mulq    %r12, %rax # X1 in rax
+  subq    %r9, %rax
   rrmovq  %rcx, %rbx
-  subq    %rax, %rbx 
-  mulq    %r12, %rbx # X2 in rbx
+  subq    %rax, %rbx
+  mulq    %r12, %rax 
+  addq	  %rdi, %rax # X1 memory address in rax 
+  mulq    %r12, %rbx 
+  addq	  %rdi, %rbx # X2 memory address in rbx
+	
+  # Set gap to 3gap
+  mulq	  %r12, %rcx
 
-Loop:
+  # Set two loop points : %r8, %r9
+  rrmovq  %rax, %r8
+  rrmovq  %rbx, %r9
+  addq	  %rcx, %r8
+  addq    %rcx, %r9
+
+ColorP: 
+  # Store end of line
+  rrmovq  %r10, %rbp
+  addq    %rdi, %rbp
+  pushq    %rbp
+  # Color X1, X2
+  rmmovb  %r13, (%rax)
+  rmmovb  %r13, 1(%rax)
+  rmmovb  %r14, 2(%rax)
   
+  rmmovb  %r13, (%rbx)
+  rmmovb  %r13, 1(%rbx)
+  rmmovb  %r14, 2(%rbx)
 
+# %rax = X1			%r8 = X1'
+# %rbx = X2			%r9 = X2'
+# %rcx = gap			%r10 = 3w
+# %rdx = height			%r11 = 3w + pad
+# %rsi = weight			%r12 = 3
+# %rdi = ptr(0,H-1)		%r13 = 0
+# %rbp				%r14 = 255
+# %rsp  
+  popq %rbp
+ColorLoop:
+  rmmovb  %r13, (%r8)
+  rmmovb  %r13, 1(%r8)
+  rmmovb  %r14, 2(%r8)
+  
+  rmmovb  %r13, (%r9)
+  rmmovb  %r13, 1(%r9)
+  rmmovb  %r14, 2(%r9)
 
+IncIterator:
+  addq    %rcx, %r9
+  addq	  %rcx, %r8
+  rrmovq  %rbp, %rsi
+  subq	  %r9, %rsi
+  jg      ColorLoop
+  subq    %rcx, %r9
+  rrmovq  %rbp, %rsi
+  subq    %r8, %rsi
+  jg      ColorLoop
 
-
-
-
-
-
-compareSecond:
+IncPoint:
+  addq    %r11, %rdi
+  addq    %r11, %rax
+  iaddq   $-1, %rax
+  addq    %r11, %rbx
+  iaddq   $1, %rbx
+  rrmovq  %rdi, %rbp
+  subq    %rax, %rbp
+  jle	  ColorP
+  addq    %rcx, %rax
+  rrmovq  %rdi, %rbx
 
