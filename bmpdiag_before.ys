@@ -14,19 +14,19 @@
 #------------------------------------------------------------------
 
 bmp_diag:
-	# imgptr is in %rdi
-	# width  is in %rsi
-	# height is in %rdx
-	# gap 	 is in %rcx
-	#-----------------------------------------------------------------
+  # imgptr is in %rdi
+  # width  is in %rsi
+  # height is in %rdx
+  # gap    is in %rcx
+  #-----------------------------------------------------------------
 
-	# FILL HERE
-	# You are allowed to use any register supported by Y86-64 architecture
+  # FILL HERE
+  # You are allowed to use any register supported by Y86-64 architecture
 
 #############Setting Registers To ###############
 #       rax : padding ==> rep   r8 : X=0
 #       rcx : gap               r9 : (h-1)(3w + pad) ==> Y=0
-#       rdx : height-1          r10 : 3w + pad
+#       rdx : height            r10 : 3w + pad
 #       rbx : 3*gap+3           r11 : 0x03
 #       rsp :                   r12 : 0x01
 #       rbp :                   r13 : 0x00
@@ -35,107 +35,100 @@ bmp_diag:
 #################################################
 
   irmovq        $3, %r11
-  irmovq        $1, %r12
   irmovq        $0, %r13
   irmovq        $255, %r14
 
   rrmovq        %rsi, %rax
   andq          %r11, %rax  # pad in %rax
-
-
-  addq          %r12, %rcx  # gap + 1 in %rcx
+  iaddq         $1, %rcx  # gap + 1 in %rcx
   rrmovq        %rcx, %rbx
-  mulq          %r11, %rbx
-  addq          %r11, %rbx  # 3(gap)+3 in %rbx
+  mulq          %r11, %rbx  # 3(gap)+3 in %rbx
   rrmovq        %rsi, %r10
   mulq          %r11, %r10
-  addq          %rax, %r10  # 3w + pad in %r10
-  subq          %r12, %rcx  # gap in %rcx
-  subq          %r12, %rdx  # h-1 in %rdx
-
+  rrmovq        %r10, %r12  # 3w in %r12
+  iaddq         $-1, %rcx  # gap in %rcx
+  iaddq         $-1, %rdx  # h-1 in %rdx
   rrmovq        %r10, %r9
+  addq          %rax, %r9  # 3w+pad in %r9
   mulq          %rdx, %r9   # (h-1)(3w+pad) in %r9
+  iaddq         $1, %rdx    # h in %rdx
+  rrmovq        %rbx,%r10
+  addq          %rbx, %r10
+  subq          %r11, %r10  # y decrement in %r10
   addq          %r9, %rdi   # imgptr set to (0,0)
-  rrmovq        %rsi, %rax
-  divq          %rcx, %rax  #repition count in %rax
-  rrmovq        %rax, %rbp
-  mulq          %rcx, %rbp
-  rrmovq        %rsi, %r8
-  subq          %rbp, %r8
-  pushq         %r8         #store residual num of pixel
+  subq          %r11, %r12
+  addq          %rdi, %r12  # endpoint(0, W-1) in %r12
   xorq          %r8, %r8    # X=0 in r9
   xorq          %r9, %r9  # Y=0 in r10
 
 ###############Current Register##################
-#       rax : rep               r8 : X=0
+#       rax :                   r8 : X=0
 #       rcx : gap               r9 : Y=0
-#       rdx : height            r10 : 3w + pad + 3(w-1)(Y decrement)
+#       rdx : height            r10 : Y decrement
 #       rbx : 3(gap+1)          r11 : 0x03
-#       rsp :                   r12 : 0x01
+#       rsp :                   r12 : endpoint
 #       rbp :                   r13 : 0x00
 #       rsi : width             r14 : 0xff
-#       rdi : imgptr
+#       rdi : imgptr(0,0)
 #################################################
 
-.compare:
+compare:
   rrmovq        %r8, %rbp
   addq          %r9, %rbp
   divq          %rcx, %rbp
   mulq          %rcx, %rbp
   subq          %r9, %rbp
   subq          %r8, %rbp
-  jnz           .compare2
+  jne           compare2
 
-.color:
-  popq          %rbp
-  pushq         %rax
+color:
   pushq         %rdi
-  pushq         %rbp
+  rrmovq        %r12, %rbp
 
-.jumpcolor:
-  movb          %r13,(%rdi)
-  movb          %r13,1(%rdi)
-  movb          %r14,2(%rdi) #set current pixel to red
-  addq          %rbx, %rdi
-  subq          %r12, %rax
-  jg            .jumpcolor
-  subq          %r8, %rbp
-  jg            .jumpcolor
+jumpcolor:
+  rrmovq          %rbp, %r12
+  rmmovb          %r13,(%rdi)
+  rmmovb          %r13,1(%rdi)
+  rmmovb          %r14,2(%rdi) #set current pixel to red
+  addq            %rbx, %rdi
+  subq            %rdi, %r12
+  jg              jumpcolor
 
-.reset:
-  popq          %rbp
+reset:
   popq          %rdi
-  popq          %rax
-  pushq         %rbp
-  jmp           .inc
+  jmp           inc
 
-.compare2:
+compare2:
   rrmovq        %r9, %rbp
-  subq          %r8, %rbp
+  subq          %r8, %rbp # y - x
+  cmovg   %rbp, %rbp
+  rrmovq  %r8, %r12
+  subq    %r9, %r12 # x - y
+  cmovg   %r12, %rbp
+  rrmovq  %rbp, %r12
   divq          %rcx, %rbp
   mulq          %rcx, %rbp
-  addq          %r8, %rbp
-  subq          %r9, %rbp
-  jnz           .inc
-  jmp            .color
+  subq          %r12, %rbp
+  jne           inc
+  jmp           color
  
-.inc
+inc:
   rrmovq        %rcx, %rbp
-  addq          %r12, %r8  # X=X+1
   subq          %r8, %rbp
-  jg           .Xinc
+  jge           Xinc
   xorq          %r8, %r8   # X=0
   rrmovq        %rdx, %rbp
-  addq          %r12, %r9  # Y=Y+1
+  iaddq         $1, %r9  # Y=Y+1
   subq          %r9, %rbp
-  jg           .Yinc
+  jg            Yinc
   ret
 
-.Xinc
-  addq          %r11, %rdi 
-  jmp           .compare
+Xinc:
+  iaddq         $1, %r8
+  iaddq         $3, %rdi 
+  jmp           compare
 
-.Yinc
+Yinc:
   subq          %r10, %rdi
-  jmp           .compare
+  jmp           compare
 
