@@ -35,7 +35,6 @@ bmp_diag:
 #################################################
 
   irmovq        $3, %r11
-  irmovq        $1, %r12
   irmovq        $0, %r13
   irmovq        $255, %r14
 
@@ -43,28 +42,27 @@ bmp_diag:
   andq          %r11, %rax  # pad in %rax
 
 
-  addq          %r12, %rcx  # gap + 1 in %rcx
+  iaddq         $1, %rcx  # gap + 1 in %rcx
   rrmovq        %rcx, %rbx
   mulq          %r11, %rbx  # 3(gap)+3 in %rbx
   rrmovq        %rsi, %r10
   mulq          %r11, %r10
+  rrmovq	%r10, %r12  # 3w in %r12
   addq          %rax, %r10  # 3w + pad in %r10
-  subq          %r12, %rcx  # gap in %rcx
-  subq          %r12, %rdx  # h-1 in %rdx
+  iaddq         $-1, %rcx  # gap in %rcx
+  iaddq         $-1, %rdx  # h-1 in %rdx
   rrmovq        %r10, %r9
   mulq          %rdx, %r9   # (h-1)(3w+pad) in %r9
-  addq          %r12, %rdx  # h in %rdx
+  iaddq         $1, %rdx    # h in %rdx
   addq          %r10, %r10
   subq          %rax, %r10
   subq          %r11, %r10
   addq          %r9, %rdi   # imgptr set to (0,0)
   rrmovq        %rsi, %rax
   divq          %rcx, %rax  #repition count in %rax
-  rrmovq        %rax, %rbp
-  mulq          %rcx, %rbp
-  rrmovq        %rsi, %r8
-  subq          %rbp, %r8
-  pushq         %r8         #store residual num of pixel
+  subq		%r11, %r12
+  addq		%rdi, %r12  # endpoint(0, W-1) in %r12
+  # pushq         %r12       #store endpoint of first line
   xorq          %r8, %r8    # X=0 in r9
   xorq          %r9, %r9  # Y=0 in r10
 
@@ -73,7 +71,7 @@ bmp_diag:
 #       rcx : gap               r9 : Y=0
 #       rdx : height            r10 : 3w + pad + 3(w-1)(Y decrement)
 #       rbx : 3(gap+1)          r11 : 0x03
-#       rsp :                   r12 : 0x01
+#       rsp :                   r12 : endpoint
 #       rbp :                   r13 : 0x00
 #       rsi : width             r14 : 0xff
 #       rdi : imgptr
@@ -89,27 +87,18 @@ compare:
   jne           compare2
 
 color:
-  popq          %rbp
-  pushq         %rax
   pushq         %rdi
-  pushq         %rbp
 
 jumpcolor:
   rmmovb          %r13,(%rdi)
   rmmovb          %r13,1(%rdi)
   rmmovb          %r14,2(%rdi) #set current pixel to red
-  addq          %rbx, %rdi
-  iaddq         $-1, %rax
-  jl            jumpcolor
-
-  subq          %r8, %rbp
-  jl            jumpcolor
+  addq            %rbx, %rdi
+  subq            %rdi, %r12
+  jg              jumpcolor
 
 reset:
-  popq          %rbp
   popq          %rdi
-  popq          %rax
-  pushq         %rbp
   jmp           inc
 
 compare2:
@@ -130,13 +119,12 @@ inc:
   rrmovq        %rcx, %rbp
   iaddq         $1, %r8  # X=X+1
   subq          %r8, %rbp
-  jle           Xinc
+  jge           Xinc
   xorq          %r8, %r8   # X=0
   rrmovq        %rdx, %rbp
   iaddq         $1, %r9  # Y=Y+1
   subq          %r9, %rbp
-  jl            Yinc
-  popq          %rax
+  jg            Yinc
   ret
 
 Xinc:
