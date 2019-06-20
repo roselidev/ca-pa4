@@ -96,8 +96,8 @@ JustP:
 # %rsp  
 
 JustLoop:
-  rrmovq  %rbp, %r12
   rrmovq  %rbp, %rsi
+  rrmovq  %rbp, %r12
   rmmovb  %r13, (%r8)
   rmmovb  %r13, 1(%r8)
   rmmovb  %r14, 2(%r8)
